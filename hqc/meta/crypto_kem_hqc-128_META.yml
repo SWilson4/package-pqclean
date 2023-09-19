@@ -1,0 +1,10 @@
+name: HQC-128
+type: kem
+claimed-nist-level: 1
+claimed-security: IND-CCA2
+length-ciphertext: 4433
+length-public-key: 2249
+length-secret-key: 2305
+length-shared-secret: 64
+nistkat-sha256: 74290ad7a789c01aa92cd7f72f1b5ba5fa30a58294cdf2df52b9c76c3aafba3b
+nistkat-rng: hqc

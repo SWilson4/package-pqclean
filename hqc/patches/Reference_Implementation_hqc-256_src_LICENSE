@@ -1,0 +1,6 @@
+--- upstream/Reference_Implementation/hqc-256/src/LICENSE
++++ upstream-patched/Reference_Implementation/hqc-256/src/LICENSE
+@@ -1 +0,0 @@
+-Public domain
+\ No newline at end of file
+

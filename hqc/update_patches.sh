@@ -41,6 +41,8 @@ diff -ruN --no-dereference ${V1} ${V2} > ${PATCHES}/tmp/p
   mv ${X} ${Y}
   sed -i '1,2 s/\t.*$//' ${Y}
   sed -i '$ s/diff.*//' ${Y}
+  # resolve .cpp / .c renaming
+  #sed -ri 's/\+\+\+(.*)\.cpp/+++\1.c/g' ${Y}
   done
 )
 mv ${PATCHES}/tmp/* ${PATCHES}
