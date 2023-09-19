@@ -113,11 +113,11 @@
 -        for(k = PARAM_N1 - PARAM_K - 1; k; --k) {
 -            cdw_bytes[k] = cdw_bytes[k - 1] ^ tmp[k];
 +        for (size_t k = PARAM_N1 - PARAM_K - 1; k; --k) {
-+            cdw[k] = cdw[k - 1] ^ tmp[k];
++            cdw[k] = (uint8_t)(cdw[k - 1] ^ tmp[k]);
          }
  
 -        cdw_bytes[0] = tmp[0];
-+        cdw[0] = tmp[0];
++        cdw[0] = (uint8_t)tmp[0];
      }
  
 -    memcpy(cdw_bytes + PARAM_N1 - PARAM_K, msg_bytes, PARAM_K);
