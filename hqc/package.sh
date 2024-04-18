@@ -63,9 +63,10 @@ endtask
 task 'Copying files'
 for PARAM in hqc-{128,192,256}
 do
-  mkdir -p ${BUILD_CRYPTO_KEM}/${PARAM}/clean
+  mkdir -p ${BUILD_CRYPTO_KEM}/${PARAM}/{clean,avx2}
   cp -Lp ${BUILD_UPSTREAM}/Reference_Implementation/${PARAM}/src/*.{cpp,h} ${BUILD_CRYPTO_KEM}/${PARAM}/clean/
-  rm -f ${BUILD_CRYPTO_KEM}/${PARAM}/clean/main_*
+  cp -Lp ${BUILD_UPSTREAM}/Optimized_Implementation/${PARAM}/src/*.{c,h} ${BUILD_CRYPTO_KEM}/${PARAM}/avx2/
+  rm -f ${BUILD_CRYPTO_KEM}/${PARAM}/{clean,avx2}/main_*
   # rename .cpp -> .c
   for file in ${BUILD_CRYPTO_KEM}/${PARAM}/clean/*.cpp
   do
@@ -77,8 +78,11 @@ endtask
 task 'Renaming hash, rng, and intrinsic includes'
 for PARAM in hqc-{128,192,256}
 do
-  sed -s -i 's/hash\.h/sha2.h/' ${BUILD_CRYPTO_KEM}/${PARAM}/clean/*.{c,h}
-  sed -s -i 's/#include "rng\.h"/#include "nistseedexpander\.h"\n#include "randombytes\.h"/' ${BUILD_CRYPTO_KEM}/${PARAM}/clean/*.{c,h}
+  sed -s -i 's/hash\.h/sha2.h/' ${BUILD_CRYPTO_KEM}/${PARAM}/{clean,avx2}/*.{c,h}
+  sed -s -i 's/#include "rng\.h"/#include "nistseedexpander\.h"\n#include "randombytes\.h"/' ${BUILD_CRYPTO_KEM}/${PARAM}/{clean,avx2}/*.{c,h}
+  sed -s -i 's/nmmintrin\.h/immintrin.h/' ${BUILD_CRYPTO_KEM}/${PARAM}/avx2/*.{c,h}
+  sed -s -i 's/wmmintrin\.h/immintrin.h/' ${BUILD_CRYPTO_KEM}/${PARAM}/avx2/*.{c,h}
+  sed -s -i 's/x86intrin\.h/immintrin.h/' ${BUILD_CRYPTO_KEM}/${PARAM}/avx2/*.{c,h}
 done
 endtask
 
@@ -89,7 +93,7 @@ endtask
 task 'Checking include guards'
 for PARAM in hqc-{128,192,256}
 do
-  for IMPL in clean #avx2
+  for IMPL in clean avx2
   do
     for F in ${BUILD_CRYPTO_KEM}/${PARAM}/${IMPL}/*.h
     do
@@ -114,7 +118,7 @@ endtask
 task 'Sorting #includes'
 for PARAM in hqc-{128,192,256}
 do
-  for IMPL in clean #avx2
+  for IMPL in clean avx2
   do
     for F in ${BUILD_CRYPTO_KEM}/${PARAM}/${IMPL}/*.h
     do
@@ -143,7 +147,7 @@ task "Preparing for duplicate consistency"
 ( cd ${MANIFEST}
 for P1 in hqc-{128,192,256}
 do
-  for OUT in clean #avx2
+  for OUT in clean avx2
   do
     sha1sum ${BUILD_CRYPTO_KEM}/${P1}/${OUT}/*.{h,c} > ${P1}_${OUT}.xxx
   done
@@ -152,9 +156,9 @@ done
 endtask
 
 ( cd ${MANIFEST}
-for P1 in hqc-{128,192}
+for P1 in hqc-{128,192,256}
 do
-  for OUT in clean #avx2
+  for OUT in clean avx2
   do
     task "${P1}/${OUT} duplicate consistency"
     echo "\
@@ -162,7 +166,7 @@ consistency_checks:" > ${P1}_${OUT}.yml
     for P2 in hqc-{128,192,256}
 
     do
-      for IN in clean #avx2
+      for IN in clean avx2
       do
         if ([ "${P1}" == "${P2}" ] && [ "${IN}" == "${OUT}" ]) || [ "${P1}" \> "${P2}" ]; then continue; fi
         FIRST=1
@@ -196,7 +200,7 @@ sed -i -s 's/^\(size_t\|int\|uint.._t\|uint8_t\|void\|__m256i\) \([^(]*\)(.*);/#
 
 for PARAM in hqc-{128,192,256}
 do
-  for IMPL in clean #avx2
+  for IMPL in clean avx2
   do
     ( cd ${BUILD_CRYPTO_KEM}/${PARAM}/${IMPL}
     NAMESPACE=$(echo PQCLEAN_${PARAM//-/}_${IMPL} | tr [:lower:] [:upper:])
@@ -218,6 +222,7 @@ do
   ( cd ${BUILD_CRYPTO_KEM}/${PARAM}/
 
   echo "Public Domain" > clean/LICENSE
+  cp -Lp clean/LICENSE avx2/LICENSE
   cp -Lp ${BASE}/meta/crypto_kem_${PARAM}_META.yml META.yml
   echo "\
 principal-submitters:
@@ -237,7 +242,18 @@ principal-submitters:
   - Gilles Zémor
 implementations:
     - name: clean
-      version: ${ARCHIVE/.zip/} via https://github.com/SWilson4/package-pqclean/tree/${PACKAGER:0:8}/hqc" >> META.yml
+      version: ${ARCHIVE/.zip/} via https://github.com/SWilson4/package-pqclean/tree/${PACKAGER:0:8}/hqc
+    - name: avx2
+      version: ${ARCHIVE/.zip/} via https://github.com/SWilson4/package-pqclean/tree/${PACKAGER:0:8}/hqc
+      supported_platforms:
+          - architecture: x86_64
+            operating_systems:
+                - Linux
+                - Darwin
+            required_flags:
+                - avx2
+                - bmi1
+                - pclmulqdq" >> META.yml
 
   echo "\
 # This Makefile can be used with GNU Make or BSD Make
@@ -280,6 +296,30 @@ all: \$(LIBRARY)
 clean:
     -DEL \$(OBJECTS)
     -DEL \$(LIBRARY)" > clean/Makefile.Microsoft_nmake
+
+echo "\
+# This Makefile can be used with GNU Make or BSD Make
+
+LIB=lib${PARAM}_avx2.a
+HEADERS=$(basename -a avx2/*.h | tr '\n' ' ')
+OBJECTS=$(basename -a avx2/*.c | sed 's/\.c/.o/' | tr '\n' ' ')
+
+CFLAGS=-O3 -mavx2 -mbmi -mpclmul -Wall -Wextra -Wshadow -Wpedantic -Wvla -Werror -Wredundant-decls -Wmissing-prototypes -std=c99 -I../../../common \$(EXTRAFLAGS)
+
+all: \$(LIB)
+
+%.o: %.s \$(HEADERS)
+	\$(AS) -o \$@ $<
+
+%.o: %.c \$(HEADERS)
+	\$(CC) \$(CFLAGS) -c -o \$@ $<
+
+\$(LIB): \$(OBJECTS)
+	\$(AR) -r \$@ \$(OBJECTS)
+
+clean:
+	\$(RM) \$(OBJECTS)
+	\$(RM) \$(LIB)" > avx2/Makefile
 
   )
 done
