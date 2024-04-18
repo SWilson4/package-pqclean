@@ -6,7 +6,7 @@ RUN adduser pqcuser
 USER pqcuser
 
 WORKDIR /home/pqcuser
-RUN git clone https://github.com/SWilson4/package-pqclean.git package-pqclean
+RUN git clone -b hqc-20240223 --depth=1 https://github.com/SWilson4/package-pqclean.git package-pqclean
 WORKDIR ./package-pqclean/hqc
 RUN ./checkout.sh
 RUN ./package.sh
